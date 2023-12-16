@@ -9,7 +9,8 @@ enum AppEventTypeEnum {
     AppShutdownEventType,
 };
 
-typedef void (*listener_callback)();
+struct App;
+typedef void (*listener_callback)(const char*);
 struct AppEventListener {
     listener_callback callback;
 };
@@ -41,7 +42,7 @@ void emit_event(AppEvent *event){
     printf("emit AppEvent(name=\"%s\")\n", event->name);
     for (int i = 0; i < event->listeners_count; i++) {
         struct AppEventListener listener = event->listeners[i];
-        listener.callback();
+        listener.callback(event->name);
     }
 }
 
@@ -62,7 +63,7 @@ enum AppState {
     APP_STOPPED
 };
 
-typedef struct {
+typedef struct App {
     const char *title;
     enum AppState state;
     AppEvent on_startup;
@@ -110,25 +111,25 @@ void _delay(){
     usleep(_random_between(min, max));
 }
 
-void on_startup_connect_to_database(){
-    printf("[on_startup] connect_to_database\n");
+void on_startup_connect_to_database(const char *value){
+    printf("[on_%s] connect_to_database\n", value);
     _delay();
 }
 
-void on_startup_connect_rmq(){
-    printf("[on_startup] connect_rmq\n");
+void on_startup_connect_rmq(const char *value){
+    printf("[on_%s] connect_rmq\n", value);
     _delay();
 }
-void on_startup_warmup_cache(){
-    printf("[on_startup] warmup_cache\n");
+void on_startup_warmup_cache(const char *value){
+    printf("[on_%s] warmup_cache\n", value);
     _delay();
 }
-void on_shutdown_close_database(){
-    printf("[on_shutdown] close_database\n");
+void on_shutdown_close_database(const char *value){
+    printf("[on_%s] close_database\n", value);
     _delay();
 }
-void notify_admins(){
-    printf("[event] notify_admins\n");
+void notify_admins(const char *value){
+    printf("[on_%s] notify_admins\n", value);
     _delay();
 }
 
@@ -142,25 +143,32 @@ void connect_lifecycle_handlers(App *app){
     add_listener_to_event(&app->on_shutdown, notify_admins);
 }
 
+void _emulate_app_process(){
+    char *stages[] = {
+        "request to cache",
+        "cache expired",
+        "request to pgsql",
+        "set values to cache",
+        "send to rmq results",
+        NULL
+    };
+    
+    char **current_stage = stages;
+    while (*current_stage) {
+        // int is_success = _random_between(0 , 1);
+        printf("\t*%s*\n", *current_stage++);
+        _delay();
+    }
+}
 
 int main(){
+    srand(time(0));
+
     App app = create_app("Test observer");
     connect_lifecycle_handlers(&app);
     start_app(&app);
 
-    srand(time(0));
-    char *stages[] = {
-        "\trequest to cache",
-        "\tcache expired",
-        "\trequest to pgsql",
-        "\tset values to cache",
-        "\tsend to rmq results",
-        NULL
-    };
-    char **current_stage = stages;
-    while (*current_stage) {
-        printf("%s\n", *current_stage++);
-    }
+    _emulate_app_process();
 
     shutdown_app(&app);
     return 0;
